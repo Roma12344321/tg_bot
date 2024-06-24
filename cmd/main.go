@@ -7,6 +7,7 @@ import (
 	"myBot/pkg/handler"
 	"myBot/pkg/service"
 	"myBot/pkg/storage"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -21,7 +22,8 @@ func main() {
 	signal.Notify(chanOs, syscall.SIGINT, syscall.SIGTERM)
 	m := &sync.Map{}
 	storages := storage.NewStorage(m)
-	services := service.NewService(storages, ctx)
+	client := &http.Client{}
+	services := service.NewService(ctx, storages, client)
 	handlers := handler.NewHandler(services)
 	go handlers.InitBot(ctx)
 	<-chanOs

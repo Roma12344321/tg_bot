@@ -5,6 +5,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/spf13/viper"
 	"log"
+	"myBot/pkg/mapper"
 	"myBot/pkg/service"
 	"strings"
 )
@@ -30,6 +31,7 @@ func (h *Handler) InitBot(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Println("Bot is shutting down...")
 			return
 		case update, ok := <-updates:
 			if !ok {
@@ -51,29 +53,40 @@ func (h *Handler) handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message)
 	case "login":
 		msg := tgbotapi.NewMessage(message.Chat.ID, "Введите логин и пароль в формате <ЛОГИН> <ПАРОЛЬ>")
 		bot.Send(msg)
+	case "goods":
+		list, err := h.service.GoodService.GetAllGood(message.Chat.ID)
+		if err != nil {
+			msg := tgbotapi.NewMessage(message.Chat.ID, err.Error())
+			bot.Send(msg)
+			return
+		}
+		msg := tgbotapi.NewMessage(message.Chat.ID, mapper.MapGoodListToString(list))
+		bot.Send(msg)
 	}
 }
 
 func (h *Handler) handleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 	str := strings.Split(message.Text, " ")
-	if len(str) < 2 || len(str) > 2 {
-		h.handleStandardMessage(bot, message)
-		return
-	}
-	err := h.service.AuthService.LogIn(message.Chat.ID, str[0], str[1])
-	if err != nil {
-		msg := tgbotapi.NewMessage(message.Chat.ID, err.Error())
+	if len(str) == 2 {
+		err := h.service.AuthService.LogIn(message.Chat.ID, str[0], str[1])
+		if err != nil {
+			msg := tgbotapi.NewMessage(message.Chat.ID, err.Error())
+			msg.ReplyToMessageID = message.MessageID
+			bot.Send(msg)
+			return
+		}
+		msg := tgbotapi.NewMessage(message.Chat.ID, "успешно")
 		msg.ReplyToMessageID = message.MessageID
 		bot.Send(msg)
 		return
 	}
-	msg := tgbotapi.NewMessage(message.Chat.ID, "успешно")
-	msg.ReplyToMessageID = message.MessageID
-	bot.Send(msg)
+	h.handleStandardMessage(bot, message)
 }
 
 func (h *Handler) handleStandardMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-	msg := tgbotapi.NewMessage(message.Chat.ID, "Вот список доступных команд:\n/login")
+	msg := tgbotapi.NewMessage(message.Chat.ID, "Вот список доступных команд:\n"+
+		"/login\n"+
+		"/goods")
 	msg.ReplyToMessageID = message.MessageID
 	bot.Send(msg)
 }
